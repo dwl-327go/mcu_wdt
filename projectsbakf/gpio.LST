@@ -1,0 +1,484 @@
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE GPIO
+OBJECT MODULE PLACED IN gpio.OBJ
+COMPILER INVOKED BY: G:\Keil_v5\C51\BIN\C51.EXE gpio.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          //
+   2          #include "c8051f310.h"
+   3          
+   4          
+   5          sfr16 TMR2RL   = 0xca;                 // Timer2 reload value
+   6          sfr16 TMR2     = 0xcc;                 // Timer2 counter
+   7          
+   8          
+   9          typedef unsigned int u16;         //对数据类型进行声明定义
+  10          typedef unsigned char u8;
+  11          
+  12          
+  13          #define SYSCLK      24500000           // SYSCLK frequency in Hz
+  14          #define BAUDRATE     115200           // Baud rate of UART in bps
+  15          #define TIMER2_RATE     10000         // Timer 2 overflow rate in Hz
+  16          #define N 20
+  17          
+  18          //#define SYSCLK_TIMER  24500000/8
+  19          //#define TIMER_PRESCALER 12
+  20          //#define LED_TOGGLE_RATE 50
+  21          //
+  22          //
+  23          //#define TIMER_TICKS_PER_MS   SYSCLK_TIMER/TIMER_PRESCALER/1000
+  24          //
+  25          //#define AUX1 TIMER_TICKS_PER_MS*LED_TOGGLE_RATE
+  26          //#define AUX2 -AUX1
+  27          //#define TIMER2_RELOAD AUX2
+  28          
+  29          u8 table1[N]; 
+  30          unsigned char temp=0x35;
+  31          u8 flag35=1;
+  32          u8 flagstart=1;
+  33                  u8 flag_bg=1;
+  34                  
+  35          bit ReceiveBit;
+  36          
+  37          sbit gpio_on=P1^3;
+  38          //sbit gpio_try=P1^2;
+  39          
+  40          //void SYSCLK_Init(void);
+  41          void PORT_Init (void);
+  42          void UART0_Send_Longdata(unsigned char *str, unsigned int Stringlen);
+  43          void UART0_Init (void) ;
+  44          void delay(unsigned int m) ;
+  45          void UART0_Send_data(unsigned char Send_data) ;
+  46          void Timer2_Init (int counts);
+  47          void Timer3_Init (int counts);
+  48          unsigned char ReceiveByte(void);
+  49          //void delay(void)
+  50          //{
+  51          //      int i=0,j=0;
+  52          //      for(i=0;i<500;i++)
+  53          //              for(j=0;j<1100;j++);
+  54          //}
+  55          void main()
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 2   
+
+  56          {
+  57   1              u8 abc;
+  58   1      
+  59   1              PCA0MD &= ~0x40;                                //turn down wdt
+  60   1              OSCICN |= 0x03;
+  61   1      //      SYSCLK_Init();
+  62   1              PORT_Init();
+  63   1              UART0_Init();
+  64   1              Timer2_Init(0);
+  65   1              Timer3_Init(SYSCLK/TIMER2_RATE);
+  66   1              gpio_on = 1;
+  67   1      //      gpio_try=1;
+  68   1              
+  69   1              while(1)
+  70   1              {
+  71   2                       if(flag_bg)                                               {
+  72   3                               abc=   ReceiveByte();
+  73   3                              UART0_Send_data(abc);
+  74   3                                      UART0_Send_Longdata("hello",5);
+  75   3                                      flag_bg=0;
+  76   3                                      ET2 = 1;        
+  77   3                                      }
+  78   2      //        //if(!RI0)
+  79   2      //        temp=0x01;
+  80   2              }    
+  81   1      //      EA=1;
+  82   1      //      ES0=1;
+  83   1      //   while(1)
+  84   1      //   {
+  85   1      //     while(ReceiveBit==1)
+  86   1      //     {
+  87   1      //      ES0=0;
+  88   1      //      EA=0;
+  89   1      //      ReceiveBit=0;
+  90   1      
+  91   1      //      SBUF0=temp;
+  92   1      //      while(TI0==0);
+  93   1      //      TI0=0;
+  94   1      //      delay(60000);
+  95   1      //      delay(60000);
+  96   1      //      delay(60000);
+  97   1      //      ES0=1;
+  98   1      //      EA=1;
+  99   1      //      }
+ 100   1      //    }
+ 101   1      }
+ 102          
+ 103          void PORT_Init (void)
+ 104          {
+ 105   1              P1MDOUT = 0xff; 
+ 106   1      
+ 107   1          P0MDOUT |= 0x10;                    // enable  UTX pullup output
+ 108   1              XBR0    = 0x01;                     // enable UART on P0.4(TX) and P0.5
+ 109   1      
+ 110   1      
+ 111   1              XBR1=0x40  ;
+ 112   1      }
+ 113          
+ 114          //
+ 115          //void SYSCLK_Init(void)
+ 116          //{
+ 117          //      int i; // 延时计数器
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 3   
+
+ 118          //      P0MDOUT=0xff;   XBR1=0x40  ;
+ 119          //      P0=0x00;
+ 120          //      P0MDIN    = 0xcf;
+ 121          //      OSCXCN = 0x67; // 起动外部振荡器晶体为 22.1184MHz
+ 122          //      for (i=0; i < 50000; i++) ; // 等待振荡器启动(>1ms)
+ 123          //      while (!(OSCXCN & 0x80)) ; // 等待晶体振荡器稳定
+ 124          //
+ 125          //      OSCICN = 0x88; // 选择外部振荡器作为系统时钟源并使能丢失时钟检测器
+ 126          //
+ 127          //      CLKSEL |= 0x01;     //switch to external osc
+ 128          //
+ 129          //
+ 130          //}
+ 131          
+ 132          //void SYSCLK_Init (void) 
+ 133          //{ 
+ 134          //      OSCXCN = 0x67;                  //开启外部振荡器12MHz晶体 
+ 135          //      while(!(OSCXCN&0x80)) ; //等待晶体振荡器稳定 
+ 136          //      CLKSEL = 0x01;                  //使用外部振荡器
+ 137          //}
+ 138          
+ 139          
+ 140          void UART0_Init (void)
+ 141          {
+ 142   1              EA=0;
+ 143   1         SCON0 = 0x10;                       // SCON0: 8-bit variable bit rate
+ 144   1                                             //        level of STOP bit is ignored
+ 145   1                                            //        RX enabled
+ 146   1                                             //        ninth bits are zeros
+ 147   1                                             //        clear RI0 and TI0 bits
+ 148   1         if (SYSCLK/BAUDRATE/2/256 < 1) {
+ 149   2            TH1 = -(SYSCLK/BAUDRATE/2);
+ 150   2            CKCON &= ~0x0B;                  // T1M = 1; SCA1:0 = xx
+ 151   2            CKCON |=  0x08;
+ 152   2         } else if (SYSCLK/BAUDRATE/2/256 < 4) {
+ 153   2            TH1 = -(SYSCLK/BAUDRATE/2/4);
+ 154   2            CKCON &= ~0x0B;                  // T1M = 0; SCA1:0 = 01                  
+ 155   2            CKCON |=  0x09;
+ 156   2         } else if (SYSCLK/BAUDRATE/2/256 < 12) {
+ 157   2            TH1 = -(SYSCLK/BAUDRATE/2/12);
+ 158   2            CKCON &= ~0x0B;                  // T1M = 0; SCA1:0 = 00
+ 159   2         } else {
+ 160   2            TH1 = -(SYSCLK/BAUDRATE/2/48);
+ 161   2            CKCON &= ~0x0B;                  // T1M = 0; SCA1:0 = 10
+ 162   2            CKCON |=  0x02;
+ 163   2         }
+ 164   1      
+ 165   1         TL1 = TH1;                          // init Timer1
+ 166   1         TMOD &= ~0xf0;                      // TMOD: timer 1 in 8-bit autoreload
+ 167   1         TMOD |=  0x20;  
+ 168   1      //   ES0=1;
+ 169   1              ES0=0;
+ 170   1      //   EA=1;                     
+ 171   1         TR1 = 1;                            // START Timer1
+ 172   1      
+ 173   1      
+ 174   1         TI0 = 0;                            // Indicate TX0 ready
+ 175   1      //
+ 176   1       RI0 = 0; 
+ 177   1        ES0=0;
+ 178   1         EA=1;
+ 179   1      
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 4   
+
+ 180   1      }
+ 181          //-----------------------------------------------------------------------------
+ 182          // Timer2_Init SYSCLK no Interrupt
+ 183          //-----------------------------------------------------------------------------
+ 184          //
+ 185          // Configure Timer2 to auto-reload at interval specified by <counts> (no 
+ 186          // interrupt generated) using SYSCLK as its time base.
+ 187          #if 1
+ 188          void Timer2_Init (int counts)
+ 189          {
+ 190   1         TMR2CN = 0x00;                      // STOP Timer2; Clear TF2H and TF2L;
+ 191   1                                             // disable low-byte interrupt; disable
+ 192   1                                             // split mode; select internal timebase
+ 193   1         CKCON |= 0x10;                      // Timer2 uses SYSCLK as its timebase
+ 194   1      
+ 195   1      //   TMR2RL  = -counts;       //           // Init reload values
+ 196   1         TMR2RL  = 0x4097     ;
+ 197   1      //   TMR2RLH  = 0x60
+ 198   1         TMR2    = TMR2RLL;       //            // Init Timer2 with reload value
+ 199   1         ET2 = 0;                            // disable Timer2 interrupts
+ 200   1         TR2 = 1;                            // start Timer2
+ 201   1      }
+*** WARNING C280 IN LINE 188 OF GPIO.C: 'counts': unreferenced local variable
+ 202          void Timer3_Init (int counts)
+ 203          {
+ 204   1         TMR3CN = 0x00;                      // STOP Timer2; Clear TF2H and TF2L;
+ 205   1                                             // disable low-byte interrupt; disable
+ 206   1                                             // split mode; select internal timebase
+ 207   1         CKCON |= 0x10;                      // Timer2 uses SYSCLK as its timebase
+ 208   1      
+ 209   1         TMR3RLL  = -counts;                  // Init reload values
+ 210   1         TMR3L    = TMR3RLL;                   // Init Timer2 with reload value
+ 211   1        // ET2 = 1;                            // disable Timer2 interrupts
+ 212   1      //   TR2 = 1;                            // start Timer2
+ 213   1         EIE1   &= ~0x80;//
+ 214   1      //      EIE1   |= 0x80;//ENABLE TIMER3
+ 215   1              TMR3CN |= 0x04;//RUN TIMER3
+ 216   1      }
+ 217          #endif
+ 218          #if 0
+              void Timer2_Init (int counts)
+              {
+                CKCON &= ~0x60;                     // Timer2 uses SYSCLK/12
+                 TMR2CN &= ~0x01;
+              
+                 TMR2RL = TIMER2_RELOAD;             // Reload value to be used in Timer2
+                 TMR2 = TMR2RL;                      // Init the Timer2 register
+              
+                 TMR2CN = 0x04;                      // Enable Timer2 in auto-reload mode
+                 ET2 = 1;                            // Timer2 interrupt enabled                          // start Timer
+             -2
+              }
+              //void Timer2_Init (int counts)
+              //{
+              //   TMR2CN = 0x00;                      // STOP Timer2; Clear TF2H and TF2L;
+              //                                       // disable low-byte interrupt; disable
+              //                                       // split mode; select internal timebase
+              //   CKCON |= 0x10;                      // Timer2 uses SYSCLK as its timebase
+              //
+              //   TMR2RLL  = 0x7d;                  // Init reload values
+              //   TMR2RLH  = 0x60;
+              //   TMR2L    = TMR2RLL;                   // Init Timer2 with reload value
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 5   
+
+              //   TMR2H    = TMR2RLH;
+              //   TMR2CN = 0x04;
+              //   ET2 = 1;                            // disable Timer2 interrupts
+              //   TR2 = 1;                            // start Timer2
+              //}
+              void Timer3_Init (int counts)
+              {
+                 TMR3CN = 0x00;                      // STOP Timer2; Clear TF2H and TF2L;
+                                                     // disable low-byte interrupt; disable
+                                                     // split mode; select internal timebase
+                 CKCON |= 0x10;                      // Timer2 uses SYSCLK as its timebase
+              
+                 TMR3RLL  = 0x3e;                  // Init reload values
+                 TMR3RLH  = 0xb0;
+                 TMR3L    = TMR3RLL;                   // Init Timer2 with reload value
+                 TMR3H    = TMR3RLH;
+              
+                  EIE1   &= ~0x80;//
+              //      EIE1   |= 0x80;//ENABLE TIMER3
+                      TMR3CN |= 0x04;//RUN TIMER3
+              }
+              #endif
+ 262          //------------------------------------------------------------------------------
+ 263          void delay(unsigned int m)
+ 264          {
+ 265   1         unsigned int n;
+ 266   1         n=0;
+ 267   1         while(n<m)
+ 268   1         {n++;}
+ 269   1         return;
+ 270   1      }
+ 271          //===============================================================================
+ 272          //void UATR0_ISR(void)  interrupt 4
+ 273          //{
+ 274          //if(!TI0)
+ 275          //{
+ 276          //RI0=0;
+ 277          //temp=SBUF0;
+ 278          //ReceiveBit=1;
+ 279          //}
+ 280          //TI0=0;
+ 281          //}
+ 282          
+ 283          #if 1
+ 284          //void Uart0_Receive_interrupt()interrupt 4
+ 285          //{
+ 286          ////u8 flag=1;
+ 287          //if(RI0)
+ 288          //{
+ 289          //RI0=0;
+ 290          //
+ 291          //temp=SBUF0;
+ 292          //UART0_Send_data(temp);
+ 293          //
+ 294          //}
+ 295          //}
+ 296          
+ 297          
+ 298          
+ 299          void Timer2_ISR (void) interrupt 5
+ 300          {
+ 301   1         static int m,n=0;
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 6   
+
+ 302   1      unsigned char rbyte;
+ 303   1      //   u8 temp1;
+ 304   1      //   temp1=ReceiveByte(); UART0_Send_data(temp1);
+ 305   1         if(!RI0){//(0x35!=temp)){
+ 306   2         m++;
+ 307   2         if(m>=20000){
+ 308   3         m=0;
+ 309   3         n++;
+ 310   3              if(n>=300)
+ 311   3              {  
+ 312   4              n=0;
+ 313   4      //        if((!RI0)||(0x35!=ReceiveByte())){
+ 314   4                flag35=1;temp=0x35;
+ 315   4                flagstart=0;
+ 316   4                gpio_on = 0;
+ 317   4                EIE1   |= 0x80;
+ 318   4                ET2=0;
+ 319   4      //                              }
+ 320   4              }
+ 321   3      }
+ 322   2      }else
+ 323   1      {
+ 324   2              RI0=0;
+ 325   2              rbyte=SBUF0;
+ 326   2              if(rbyte==0x35)
+ 327   2              {
+ 328   3              m=0;n=0  ;
+ 329   3              }
+ 330   2              else
+ 331   2              {
+ 332   3                  m++;
+ 333   3         if(m>=20000){
+ 334   4         m=0;
+ 335   4         n++;
+ 336   4              if(n>=300)
+ 337   4              {  
+ 338   5                n=0;
+ 339   5      //        if((!RI0)||(0x35!=ReceiveByte())){
+ 340   5                flag35=1;temp=0x35;
+ 341   5                flagstart=0;
+ 342   5                gpio_on = 0;
+ 343   5                EIE1   |= 0x80;
+ 344   5                ET2=0;
+ 345   5      //                              }
+ 346   5              }
+ 347   4              
+ 348   4              }
+ 349   3      
+ 350   3      }
+ 351   2      //m=0;n=0;
+ 352   2      //if(temp!=0x35)
+ 353   2      //{
+ 354   2      //   m++;
+ 355   2      //   if(m>=20000){
+ 356   2      //   m=0;
+ 357   2      //   n++;
+ 358   2      //      if(n>=900)
+ 359   2      //      {  
+ 360   2      //      n=0;
+ 361   2      ////      if((!RI0)||(0x35!=ReceiveByte())){
+ 362   2      //        flag35=1;temp=0x35;
+ 363   2      //        flagstart=0;
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 7   
+
+ 364   2      //        gpio_on = 0;
+ 365   2      //        EIE1   |= 0x80;
+ 366   2      //        ET2=0;
+ 367   2      //
+ 368   2      //}
+ 369   2      //  }
+ 370   2      
+ 371   2      
+ 372   2      
+ 373   2      
+ 374   2      
+ 375   2      }
+ 376   1      }
+ 377          
+ 378          
+ 379          
+ 380          void Timer3_ISR (void) interrupt 14
+ 381          {
+ 382   1         static int l,p=0;
+ 383   1         l++;
+ 384   1         if(l>=20000){
+ 385   2         l=0;
+ 386   2         p++;
+ 387   2              if(p>=130)
+ 388   2              {  
+ 389   3              p=0;
+ 390   3                if(!flagstart){
+ 391   4                flagstart=1;temp=0x35;
+ 392   4                gpio_on = 1;
+ 393   4                EIE1   &= ~0x80;//
+ 394   4                //ET2=1;
+ 395   4                flag_bg=1;
+ 396   4                                        }
+ 397   3              }
+ 398   2      }
+ 399   1      }
+ 400          
+ 401          #endif
+ 402          
+ 403          #if 0
+              void Timer2_ISR (void) interrupt 5
+              {
+                        static int pp=0;
+                        pp++;
+                        if(pp>=10)
+                        {
+                              pp=0;
+                              gpio_on = 0;                    //~gpio_try;
+                              //ET2=0;//
+                              TF2H=0;
+                        }
+              }
+              #endif
+ 417          
+ 418          void UART0_Send_data(unsigned char Send_data)
+ 419          {
+ 420   1      SBUF0=Send_data; 
+ 421   1      while(!TI0);
+ 422   1      TI0=0; 
+ 423   1      }
+ 424          
+ 425          
+C51 COMPILER V9.01   GPIO                                                                  07/26/2019 09:18:38 PAGE 8   
+
+ 426          unsigned char ReceiveByte(void)
+ 427          {
+ 428   1              unsigned char rbyte;
+ 429   1              while(!RI0);
+ 430   1              RI0=0;
+ 431   1              rbyte=SBUF0;
+ 432   1              return rbyte;
+ 433   1      
+ 434   1      }
+ 435          
+ 436          
+ 437          void UART0_Send_Longdata(unsigned char *str, unsigned int Stringlen)
+ 438          {
+ 439   1      unsigned int i; 
+ 440   1      do { 
+ 441   2      UART0_Send_data(*(str+i)); 
+ 442   2      i++; 
+ 443   2      } 
+ 444   1      while (i<Stringlen); 
+ 445   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    457    ----
+   CONSTANT SIZE    =      6    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     32       8
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)
